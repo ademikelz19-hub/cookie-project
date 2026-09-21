@@ -6,8 +6,7 @@
     },
     "backend": {
       "root": "backend",
-      "buildCommand": "npm install && npm run build",
-      "startCommand": "node dist/index.js"
+      "buildCommand": "npm install && npm run build"
     }
   },
   "rewrites": [
