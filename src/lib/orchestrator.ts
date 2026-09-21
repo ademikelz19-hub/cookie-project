@@ -42,7 +42,7 @@ export async function runOrchestrator(intent: string, userWallet: string): Promi
   logs.push({
     type: 'policy',
     toolUsed: 'PolicyLayer::Gateway',
-    summary: `Intent parsed. Allocations: ${(alloc.bCookStakePct * 100).toFixed(0)}% bCOOK Stake · ${(alloc.cookieboxClmmPct * 100).toFixed(0)}% Cookiebox CLMM · ${(alloc.bakedBazaarGrailPotPct * 100).toFixed(0)}% Grail Pot. All actions verified against docs/policy.json.`,
+    summary: `Intent parsed. Allocations: ${(alloc.bCookStakePct * 100).toFixed(0)}% bCOOK Stake | ${(alloc.cookieboxClmmPct * 100).toFixed(0)}% Cookiebox CLMM | ${(alloc.bakedBazaarGrailPotPct * 100).toFixed(0)}% Grail Pot. All actions verified against docs/policy.json.`,
     status: 'guarded',
   });
 
@@ -55,7 +55,7 @@ export async function runOrchestrator(intent: string, userWallet: string): Promi
       logs.push({
         type: 'trade',
         toolUsed: 'cookie-mcp::stake',
-        summary: `Deposited ${amount} $COOK into bCOOK SPL Stake Pool → Minted ${bcook} bCOOK. Base APY: 7.8%.`,
+        summary: `Deposited ${amount} $COOK into bCOOK SPL Stake Pool -> Minted ${bcook} bCOOK. Base APY: 7.8%.`,
         signature: fakeSig(),
         status: 'success',
       });
@@ -74,7 +74,7 @@ export async function runOrchestrator(intent: string, userWallet: string): Promi
       logs.push({
         type: 'trade',
         toolUsed: 'cookie-mcp::trade (Candy Shop)',
-        summary: `Swapped ${half} $COOK → USDC via Candy Shop aggregator. Slippage: 80 BPS (limit 500 BPS ✓).`,
+        summary: `Swapped ${half} $COOK -> USDC via Candy Shop aggregator. Slippage: 80 BPS (limit 500 BPS [OK]).`,
         signature: fakeSig(),
         status: 'success',
       });
