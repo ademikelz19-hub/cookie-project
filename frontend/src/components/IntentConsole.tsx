@@ -69,11 +69,10 @@ export const IntentConsole: React.FC = () => {
       // Step 2: Query backend API or simulate agent workflow
       setActiveStage('Invoking cookie-mcp tools (Candy Shop, bCOOK, Cookiebox, Baked Bazaar)...');
       
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
       let backendSuccess = false;
 
       try {
-        const response = await fetch(`${backendUrl}/api/intent`, {
+        const response = await fetch(`/api/intent`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
