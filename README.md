@@ -267,7 +267,7 @@ Deposit USDC, TIA, or SOL from Ethereum, Solana, or Cosmos straight into your Au
 🧵 7/7 🚀 Live Demo & Hackathon Submission:
 Explore our open-source codebase, test the live app with Nightly Wallet, and inspect our PolicyLayer configs!
 🔗 GitHub: https://github.com/ademikelz19-hub/cookie-project
-🌐 Live App: https://cookie-project-rxov.vercel.app
+🌐 Live App: https://autarch-protocol.vercel.app
 💬 Join the discussion: t.me/TheCookieNetChain
 ```
 
