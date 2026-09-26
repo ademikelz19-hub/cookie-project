@@ -141,7 +141,7 @@ export const Dashboard: React.FC = () => {
         {/* Total Vault TVL */}
         <div className="bg-cyber-card border border-cyber-border rounded-xl p-5 hover:border-cyber-purple/50 transition-all">
           <div className="flex items-center justify-between text-neutral-400 mb-2">
-            <span className="text-xs uppercase font-mono tracking-wider">Smart Vault TVL</span>
+            <span className="text-xs uppercase font-mono tracking-wider">Your Vault Balance</span>
             <PieChart className="w-4 h-4 text-purple-400" />
           </div>
           <div className="text-2xl font-bold font-mono text-white flex items-baseline gap-2">
