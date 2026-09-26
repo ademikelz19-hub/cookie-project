@@ -3,185 +3,157 @@
 import React, {
   createContext,
   useContext,
-  useMemo,
   useCallback,
   useEffect,
   useState,
   ReactNode,
 } from 'react';
-import {
-  ConnectionProvider,
-  WalletProvider,
-  useWallet,
-} from '@solana/wallet-adapter-react';
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { Connection, clusterApiUrl } from '@solana/web3.js';
-
-// Default Styles for Solana Wallet Adapter UI
-import '@solana/wallet-adapter-react-ui/styles.css';
 
 // Cookie Chain SVM Constants
 export const COOKIE_CHAIN_RPC =
   process.env.NEXT_PUBLIC_RPC_URL || 'https://rpc.cookiescan.io';
 export const COOKIE_CHAIN_WS_RPC =
   process.env.NEXT_PUBLIC_WS_RPC_URL || 'wss://rpc.cookiescan.io';
-export const COOKIE_CHAIN_GENESIS_HASH =
-  process.env.NEXT_PUBLIC_COOKIE_GENESIS_HASH ||
-  'cookie_chain_svm_mainnet'; // Custom SVM Genesis Identifier
 
-// Type definition for injected Nightly Wallet Solana API
+// Nightly Wallet type declaration
 declare global {
   interface Window {
     nightly?: {
       solana?: {
         connect: (options?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: { toString: () => string } }>;
         disconnect: () => Promise<void>;
-        changeNetwork?: (networkUrlOrId: string) => Promise<void>;
+        changeNetwork?: (rpcUrl: string) => Promise<void>;
         network?: string;
-        publicKey?: { toString: () => string };
+        publicKey?: { toString: () => string } | null;
+        isConnected?: boolean;
       };
     };
   }
 }
 
-interface CookieNetworkContextState {
+interface NightlyContextState {
+  connected: boolean;
+  publicKey: string | null;
+  connecting: boolean;
   isNightlyInstalled: boolean;
   isCookieChainNetwork: boolean;
-  currentNetwork: string | null;
-  switchToCookieChain: () => Promise<boolean>;
-  rpcEndpoint: string;
+  connect: () => Promise<void>;
+  disconnect: () => Promise<void>;
+  switchToCookieChain: () => Promise<void>;
 }
 
-const CookieNetworkContext = createContext<CookieNetworkContextState>({
+const NightlyContext = createContext<NightlyContextState>({
+  connected: false,
+  publicKey: null,
+  connecting: false,
   isNightlyInstalled: false,
   isCookieChainNetwork: false,
-  currentNetwork: null,
-  switchToCookieChain: async () => false,
-  rpcEndpoint: COOKIE_CHAIN_RPC,
+  connect: async () => {},
+  disconnect: async () => {},
+  switchToCookieChain: async () => {},
 });
 
-export const useCookieNetwork = () => useContext(CookieNetworkContext);
+export const useNightly = () => useContext(NightlyContext);
 
-interface SolanaProviderProps {
-  children: ReactNode;
-}
+export function SolanaProvider({ children }: { children: ReactNode }) {
+  const [connected, setConnected] = useState(false);
+  const [publicKey, setPublicKey] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [isNightlyInstalled, setIsNightlyInstalled] = useState(false);
+  const [isCookieChainNetwork, setIsCookieChainNetwork] = useState(false);
 
-/**
- * Inner component to manage Nightly-specific network detection and switching
- */
-function CookieNetworkInnerProvider({ children }: { children: ReactNode }) {
-  const { connected, wallet } = useWallet();
-  const [isNightlyInstalled, setIsNightlyInstalled] = useState<boolean>(false);
-  const [isCookieChainNetwork, setIsCookieChainNetwork] = useState<boolean>(false);
-  const [currentNetwork, setCurrentNetwork] = useState<string | null>(null);
-
-  // Check if Nightly is injected and inspect current network
-  const checkNightlyState = useCallback(() => {
-    if (typeof window !== 'undefined' && window.nightly?.solana) {
-      setIsNightlyInstalled(true);
-      const network = window.nightly.solana.network || 'unknown';
-      setCurrentNetwork(network);
-
-      const isCookie =
-        network.toLowerCase().includes('cookie') ||
-        network === COOKIE_CHAIN_GENESIS_HASH ||
-        network === COOKIE_CHAIN_RPC;
-
-      setIsCookieChainNetwork(isCookie);
-    } else {
-      setIsNightlyInstalled(false);
-      setIsCookieChainNetwork(false);
-    }
-  }, []);
-
+  // Detect Nightly on mount and periodically
   useEffect(() => {
-    checkNightlyState();
+    const check = () => {
+      if (typeof window !== 'undefined' && window.nightly?.solana) {
+        setIsNightlyInstalled(true);
+        const nightly = window.nightly.solana;
 
-    // Re-check periodically or on window focus
-    const interval = setInterval(checkNightlyState, 3000);
-    window.addEventListener('focus', checkNightlyState);
+        // If already connected (e.g. user returns to page), restore state
+        if (nightly.publicKey && nightly.isConnected) {
+          const pk = nightly.publicKey.toString();
+          setPublicKey(pk);
+          setConnected(true);
+        }
 
+        // Check network
+        const net = nightly.network || '';
+        setIsCookieChainNetwork(
+          net.includes('cookie') || net === COOKIE_CHAIN_RPC
+        );
+      } else {
+        setIsNightlyInstalled(false);
+      }
+    };
+
+    check();
+    const interval = setInterval(check, 2000);
+    window.addEventListener('focus', check);
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', checkNightlyState);
+      window.removeEventListener('focus', check);
     };
-  }, [checkNightlyState, connected, wallet]);
+  }, []);
 
-  /**
-   * Programmatically prompts Nightly to switch network to Cookie Chain SVM
-   */
-  const switchToCookieChain = useCallback(async (): Promise<boolean> => {
-    if (typeof window === 'undefined' || !window.nightly?.solana) {
-      console.warn('[Autarch] Nightly Wallet extension not detected.');
-      return false;
+  const connect = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+
+    if (!window.nightly?.solana) {
+      // Nightly not installed — open install page
+      window.open('https://nightly.app', '_blank');
+      return;
     }
 
     try {
-      if (typeof window.nightly.solana.changeNetwork === 'function') {
-        console.log('[Autarch] Prompting Nightly to switch to Cookie Chain RPC...');
-        await window.nightly.solana.changeNetwork(COOKIE_CHAIN_RPC);
-        checkNightlyState();
-        return true;
-      } else {
-        console.warn('[Autarch] changeNetwork method not available on window.nightly.solana');
-        return false;
+      setConnecting(true);
+      const res = await window.nightly.solana.connect();
+      const pk = res?.publicKey?.toString() || window.nightly.solana.publicKey?.toString();
+      if (pk) {
+        setPublicKey(pk);
+        setConnected(true);
       }
-    } catch (error) {
-      console.error('[Autarch] Failed to switch Nightly network to Cookie Chain:', error);
-      return false;
+    } catch (err) {
+      console.error('[Autarch] Nightly connect error:', err);
+    } finally {
+      setConnecting(false);
     }
-  }, [checkNightlyState]);
+  }, []);
+
+  const disconnect = useCallback(async () => {
+    try {
+      await window.nightly?.solana?.disconnect();
+    } catch {}
+    setConnected(false);
+    setPublicKey(null);
+  }, []);
+
+  const switchToCookieChain = useCallback(async () => {
+    if (!window.nightly?.solana) return;
+    try {
+      if (typeof window.nightly.solana.changeNetwork === 'function') {
+        await window.nightly.solana.changeNetwork(COOKIE_CHAIN_RPC);
+        setIsCookieChainNetwork(true);
+      }
+    } catch (err) {
+      console.error('[Autarch] switchToCookieChain error:', err);
+    }
+  }, []);
 
   return (
-    <CookieNetworkContext.Provider
+    <NightlyContext.Provider
       value={{
+        connected,
+        publicKey,
+        connecting,
         isNightlyInstalled,
         isCookieChainNetwork,
-        currentNetwork,
+        connect,
+        disconnect,
         switchToCookieChain,
-        rpcEndpoint: COOKIE_CHAIN_RPC,
       }}
     >
       {children}
-    </CookieNetworkContext.Provider>
-  );
-}
-
-/**
- * Core SolanaProvider for Autarch Protocol.
- *
- * CRITICAL ARCHITECTURAL CONSTRAINTS:
- * 1. Points dynamically to https://rpc.cookiescan.io.
- * 2. Strict Standard Wallet Discovery: initializes with wallets={[]} to allow standard-compliant
- *    extensions like Nightly to auto-connect cleanly without legacy adapter bundle bloat.
- * 3. Enforces window.nightly.solana.changeNetwork() verification for Cookie Chain SVM.
- */
-export function SolanaProvider({ children }: SolanaProviderProps) {
-  // Direct RPC Connection to Cookie Chain SVM with WebSocket commitment
-  const endpoint = useMemo(() => COOKIE_CHAIN_RPC, []);
-
-  // Standard wallet discovery: empty array delegates purely to @solana/wallet-standard
-  // No legacy PhantomWalletAdapter, UnsafeBurnerWalletAdapter, or WalletConnect v1
-  const wallets = useMemo(() => [], []);
-
-  const SafeConnectionProvider = ConnectionProvider as unknown as React.FC<any>;
-  const SafeWalletProvider = WalletProvider as unknown as React.FC<any>;
-  const SafeWalletModalProvider = WalletModalProvider as unknown as React.FC<any>;
-
-  return (
-    <SafeConnectionProvider
-      endpoint={endpoint}
-      config={{
-        commitment: 'confirmed',
-        wsEndpoint: COOKIE_CHAIN_WS_RPC,
-      }}
-    >
-      <SafeWalletProvider wallets={wallets} autoConnect>
-        <SafeWalletModalProvider>
-          <CookieNetworkInnerProvider>{children}</CookieNetworkInnerProvider>
-        </SafeWalletModalProvider>
-      </SafeWalletProvider>
-    </SafeConnectionProvider>
+    </NightlyContext.Provider>
   );
 }
 

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { useNightly, COOKIE_CHAIN_RPC } from '@/contexts/SolanaProvider';
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import {
   Coins,
   TrendingUp,
@@ -26,8 +26,8 @@ interface MetricState {
 }
 
 export const Dashboard: React.FC = () => {
-  const { connected, publicKey } = useWallet();
-  const { connection } = useConnection();
+  const { connected, publicKey } = useNightly();
+  const connection = new Connection(COOKIE_CHAIN_RPC, 'confirmed');
 
   const [metrics, setMetrics] = useState<MetricState>({
     cookBalance: 0,
@@ -47,7 +47,7 @@ export const Dashboard: React.FC = () => {
     if (!connected || !publicKey) return;
     try {
       setIsLoading(true);
-      const balanceLamports = await connection.getBalance(publicKey, 'confirmed');
+      const balanceLamports = await connection.getBalance(new PublicKey(publicKey), 'confirmed');
       const cook = balanceLamports / LAMPORTS_PER_SOL;
       setMetrics((prev) => ({
         ...prev,

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useNightly } from '@/contexts/SolanaProvider';
 import { X, ArrowRight, ExternalLink, ShieldCheck, Zap, Info } from 'lucide-react';
 
 interface BridgeModalProps {
@@ -10,7 +10,7 @@ interface BridgeModalProps {
 }
 
 export const BridgeModal: React.FC<BridgeModalProps> = ({ isOpen, onClose }) => {
-  const { publicKey } = useWallet();
+  const { publicKey } = useNightly();
   const [originChain, setOriginChain] = useState('Ethereum');
   const [asset, setAsset] = useState('USDC');
   const [amount, setAmount] = useState('100');
@@ -93,7 +93,7 @@ export const BridgeModal: React.FC<BridgeModalProps> = ({ isOpen, onClose }) => 
             <div className="flex items-center justify-between text-neutral-400 font-mono">
               <span>Target Vault Recipient:</span>
               <span className="text-cookie-300 font-mono">
-                {publicKey ? `${publicKey.toBase58().slice(0, 6)}...${publicKey.toBase58().slice(-4)}` : 'Connect Nightly'}
+                {publicKey ? `${publicKey.slice(0, 6)}...${publicKey.slice(-4)}` : 'Connect Nightly'}
               </span>
             </div>
             <div className="flex items-center justify-between text-neutral-400 font-mono">

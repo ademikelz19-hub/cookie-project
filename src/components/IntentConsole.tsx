@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useNightly } from '@/contexts/SolanaProvider';
 import { Sparkles, Play, ShieldAlert, ArrowRight, CheckCircle2, Loader2, Bot } from 'lucide-react';
 import { LogEntry } from './ExecutionLogs';
 
@@ -25,7 +25,7 @@ const PRESETS = [
 ];
 
 export const IntentConsole: React.FC = () => {
-  const { connected, publicKey } = useWallet();
+  const { connected, publicKey } = useNightly();
   const [intentText, setIntentText] = useState(
     'Stake 40% of my vault in bCOOK, allocate 40% to Cookiebox CLMM pools, and use 20% to farm Grail Pot jackpot tickets on Baked Bazaar.'
   );
@@ -77,7 +77,7 @@ export const IntentConsole: React.FC = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             intent: intentText,
-            userWallet: publicKey?.toBase58() || 'SimulatedVaultPDA',
+            userWallet: publicKey || 'SimulatedVaultPDA',
           }),
         });
         if (response.ok) {
