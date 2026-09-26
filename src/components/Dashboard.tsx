@@ -31,16 +31,33 @@ export const Dashboard: React.FC = () => {
 
   const [metrics, setMetrics] = useState<MetricState>({
     cookBalance: 0,
-    bCookStaked: 42.5,
-    vaultTvlCook: 1850.25,
+    bCookStaked: 0,
+    vaultTvlCook: 0,
     bCookApy: 7.8,
     cookieboxApy: 22.4,
-    grailPotTickets: 148,
+    grailPotTickets: 0,
     grailPotJackpotCook: 125000,
     activePoolsCount: 3,
   });
 
   const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch protocol metrics from Next.js API
+  useEffect(() => {
+    fetch('/api/metrics')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data) {
+          setMetrics((prev) => ({
+            ...prev,
+            bCookApy: data.bCookApy || prev.bCookApy,
+            cookieboxApy: data.cookieboxClmmApy || prev.cookieboxApy,
+            grailPotJackpotCook: data.grailPotJackpotCook || prev.grailPotJackpotCook,
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Fetch actual COOK (SVM native lamports) balance from Cookie Chain RPC
   const fetchBalance = useCallback(async () => {

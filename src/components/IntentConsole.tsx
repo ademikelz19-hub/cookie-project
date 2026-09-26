@@ -90,32 +90,11 @@ export const IntentConsole: React.FC = () => {
       }
 
       if (!backendSuccess) {
-        // Fallback simulation for live demonstration
-        await new Promise((r) => setTimeout(r, 800));
         emitLog({
-          type: 'trade',
-          toolUsed: 'cookie-mcp::stake',
-          summary: 'Deposited 40 $COOK into bCOOK SPL Stake Pool. Received 38.9 bCOOK receipt tokens.',
-          signature: '4hG8...82mQ',
-          status: 'success',
-        });
-
-        await new Promise((r) => setTimeout(r, 700));
-        emitLog({
-          type: 'mcp',
-          toolUsed: 'cookie-mcp::add_liquidity',
-          summary: 'Cookiebox CLMM: Minted position into pool #104. Automated fee compounding enabled.',
-          signature: '3wP1...99kL',
-          status: 'success',
-        });
-
-        await new Promise((r) => setTimeout(r, 800));
-        emitLog({
-          type: 'grail_pot',
-          toolUsed: 'cookie-mcp::make_offer',
-          summary: 'Baked Bazaar Auction House: Placed 15 $COOK bid on Sesamian floor. Farmed +3 Grail Pot tickets.',
-          signature: '5xT2...11vM',
-          status: 'success',
+          type: 'error',
+          toolUsed: 'Agent::Executor',
+          summary: 'Unable to communicate with /api/intent endpoint. Please check your internet connection and retry.',
+          status: 'failed',
         });
       }
 

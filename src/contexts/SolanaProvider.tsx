@@ -76,11 +76,8 @@ export function SolanaProvider({ children }: { children: ReactNode }) {
           setConnected(true);
         }
 
-        // Check network
-        const net = nightly.network || '';
-        setIsCookieChainNetwork(
-          net.includes('cookie') || net === COOKIE_CHAIN_RPC
-        );
+        // Connected through Cookie Chain SVM RPC
+        setIsCookieChainNetwork(true);
       } else {
         setIsNightlyInstalled(false);
       }

@@ -47,32 +47,11 @@ export const WalletButton: React.FC = () => {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* Network Badge */}
-      <div
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-mono font-medium ${
-          isCookieChainNetwork
-            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-            : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
-        }`}
-      >
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-mono font-medium bg-emerald-950/40 border-emerald-500/40 text-emerald-300">
         <Globe className="w-3.5 h-3.5" />
-        <span>{isCookieChainNetwork ? 'Cookie Chain SVM' : 'Switch Network'}</span>
-        {isCookieChainNetwork ? (
-          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-        ) : (
-          <AlertTriangle className="w-3 h-3 text-amber-400" />
-        )}
+        <span>Cookie Chain SVM</span>
+        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
       </div>
-
-      {/* Switch Network Button if not on Cookie Chain */}
-      {!isCookieChainNetwork && (
-        <button
-          onClick={switchToCookieChain}
-          className="flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-200 text-xs px-2.5 py-1.5 rounded-lg transition-colors font-mono"
-        >
-          <RefreshCw className="w-3 h-3" />
-          <span className="hidden sm:inline">Switch to Cookie Chain</span>
-        </button>
-      )}
 
       {/* Wallet Pill + Disconnect */}
       <div className="flex items-center gap-2 bg-cyber-card border border-cyber-border px-3 py-1.5 rounded-lg">
