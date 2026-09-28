@@ -18,7 +18,8 @@ class RegisterRequest(BaseModel):
     role: Optional[UserRole] = UserRole.MEMBER
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: Optional[str] = None
+    username: Optional[str] = None
     password: str
 
 class FirebaseLoginRequest(BaseModel):
@@ -91,7 +92,10 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(req: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == req.email).first()
+    identifier = (req.email or req.username or "").strip().lower()
+    if not identifier:
+        raise HTTPException(status_code=400, detail="Email or username is required")
+    user = db.query(User).filter(User.email.ilike(identifier)).first()
     if not user or not user.hashed_password or not verify_password(req.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     
