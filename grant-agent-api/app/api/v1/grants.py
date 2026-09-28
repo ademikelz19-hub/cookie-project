@@ -66,6 +66,7 @@ def get_grant(
         raise HTTPException(status_code=404, detail="Grant not found")
     return grant
 
+@router.post("/scrape", response_model=GrantResponse)
 @router.post("/paste-url", response_model=GrantResponse)
 async def paste_grant_url(
     req: PasteGrantUrlRequest,
