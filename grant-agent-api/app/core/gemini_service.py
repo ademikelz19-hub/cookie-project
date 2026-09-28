@@ -127,21 +127,29 @@ class ResilientGeminiService:
         mock_fallback_handler: Optional[Callable[[], str]] = None
     ) -> str:
         """
-        Executes a prompt across the model hierarchy with exponential backoff on transient errors.
+        Executes a prompt across a full (model × api_key) fallback matrix.
+
+        Attempt order:
+          (model_1, key_1) → (model_1, key_2) → (model_1, key_3)
+          → (model_2, key_1) → (model_2, key_2) → (model_2, key_3)
+          → (model_3, key_1) → (model_3, key_2) → (model_3, key_3)
+
+        This means if key_1 is rate-limited (429) the system automatically
+        retries with key_2 on the same model before escalating to the next
+        model tier.
         """
         job = self.create_or_resume_job(
-            db=db,
-            job_type=job_type,
-            grant_id=grant_id,
-            organisation_id=organisation_id,
-            application_id=application_id,
+            db=db, job_type=job_type, grant_id=grant_id,
+            organisation_id=organisation_id, application_id=application_id,
             existing_job_id=existing_job_id
         )
         job_id = job.id if job else None
 
-        # If no GEMINI_API_KEY is configured, gracefully invoke mock fallback
-        if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY.startswith("ENTER_"):
-            logger.info(f"Gemini API key not configured. Using deterministic fallback for {job_type} [Job: {job_id}].")
+        # Resolve available API keys
+        api_keys = settings.active_api_keys
+        if not api_keys:
+            # No valid API keys configured — use deterministic offline fallback
+            logger.info(f"No Gemini API keys configured. Using deterministic fallback for {job_type} [Job: {job_id}].")
             if mock_fallback_handler:
                 result = mock_fallback_handler()
                 if job and db:
@@ -149,75 +157,84 @@ class ResilientGeminiService:
                     job.result_payload = {"summary": "Completed via deterministic synthesis"}
                     db.commit()
                 return result
-            else:
-                return "Synthesized response (deterministic fallback mode)"
+            return "Synthesized response (deterministic fallback mode — add GEMINI_API_KEY_1 to enable AI)"
 
         last_category = "UNKNOWN"
         last_error_msg = ""
         total_attempts = 0
 
+        # Build the full attempt matrix: every (model, key) combination
         for model_idx, model_name in enumerate(self.active_models):
-            logger.info(f"Attempting model '{model_name}' (tier {model_idx + 1}/{len(self.active_models)}) for {job_type} [Job: {job_id}]")
-            
+            logger.info(
+                f"Trying model tier {model_idx + 1}/{len(self.active_models)}: '{model_name}' "
+                f"with {len(api_keys)} API key(s) [Job: {job_id}]"
+            )
             if job and db:
                 job.model_attempted = model_name
                 db.commit()
 
-            model_attempts = 0
-            while model_attempts < settings.GEMINI_MAX_RETRIES:
-                total_attempts += 1
-                model_attempts += 1
-                
-                if job and db:
-                    job.attempt_count = total_attempts
-                    db.commit()
+            for key_idx, api_key in enumerate(api_keys):
+                model_key_attempts = 0
 
-                try:
-                    result = await self._call_gemini_api(model_name, system_instruction, user_prompt)
-                    # Success
-                    logger.info(f"Successfully generated response with model '{model_name}' on attempt {model_attempts} [Job: {job_id}]")
-                    if job and db:
-                        job.status = AITaskStatus.COMPLETED
-                        job.last_error_category = None
-                        job.last_error_message = None
-                        db.commit()
-                    return result
-
-                except Exception as exc:
-                    is_transient, category, code = self._classify_error(exc)
-                    last_category = category
-                    last_error_msg = f"HTTP {code}: {type(exc).__name__}"
-                    
-                    logger.warning(
-                        f"Model '{model_name}' failed attempt {model_attempts}/{settings.GEMINI_MAX_RETRIES} "
-                        f"[Category: {category}, Transient: {is_transient}]: {last_error_msg}"
-                    )
+                while model_key_attempts < settings.GEMINI_MAX_RETRIES:
+                    total_attempts += 1
+                    model_key_attempts += 1
 
                     if job and db:
-                        job.status = AITaskStatus.RETRYING if is_transient else AITaskStatus.PERMANENTLY_FAILED
-                        job.last_error_category = last_category
-                        job.last_error_message = last_error_msg
+                        job.attempt_count = total_attempts
                         db.commit()
 
-                    if not is_transient:
-                        # Permanent error on this model (e.g. 404 unsupported model) -> immediate fallback to next model
-                        logger.info(f"Permanent error encountered for '{model_name}'. Switching immediately to next fallback model.")
-                        break
+                    try:
+                        result = await self._call_gemini_api(model_name, api_key, system_instruction, user_prompt)
+                        logger.info(
+                            f"Success with model='{model_name}' key={key_idx+1} "
+                            f"attempt={model_key_attempts} [Job: {job_id}]"
+                        )
+                        if job and db:
+                            job.status = AITaskStatus.COMPLETED
+                            job.last_error_category = None
+                            job.last_error_message = None
+                            db.commit()
+                        return result
 
-                    # Transient error (e.g. 503 UNAVAILABLE, 429) -> apply exponential backoff with jitter
-                    if model_attempts < settings.GEMINI_MAX_RETRIES:
-                        backoff = self._calculate_backoff(model_attempts)
-                        logger.info(f"Backing off for {backoff:.2f}s before retrying model '{model_name}'...")
-                        await asyncio.sleep(backoff)
-                    else:
-                        logger.warning(f"Exhausted all {settings.GEMINI_MAX_RETRIES} retries for model '{model_name}'. Falling back.")
+                    except Exception as exc:
+                        is_transient, category, code = self._classify_error(exc)
+                        last_category = category
+                        last_error_msg = f"HTTP {code}: {type(exc).__name__}"
 
-        # If all models failed
-        logger.error(f"All Gemini models exhausted for job {job_id}. Last category: {last_category}")
-        
-        # Check if fallback handler is available
+                        logger.warning(
+                            f"model='{model_name}' key={key_idx+1} "
+                            f"attempt={model_key_attempts}/{settings.GEMINI_MAX_RETRIES} "
+                            f"[{category}, transient={is_transient}]: {last_error_msg}"
+                        )
+
+                        if job and db:
+                            job.status = AITaskStatus.RETRYING if is_transient else AITaskStatus.PERMANENTLY_FAILED
+                            job.last_error_category = last_category
+                            job.last_error_message = last_error_msg
+                            db.commit()
+
+                        if not is_transient:
+                            # Permanent error (e.g. 404 bad model, 401 bad key) — skip this key immediately
+                            logger.info(f"Permanent error for model='{model_name}' key={key_idx+1}. Trying next key.")
+                            break
+
+                        # Rate-limit / capacity error — back off then retry this (model, key) pair
+                        if model_key_attempts < settings.GEMINI_MAX_RETRIES:
+                            backoff = self._calculate_backoff(model_key_attempts)
+                            logger.info(f"Backing off {backoff:.2f}s before retry...")
+                            await asyncio.sleep(backoff)
+                        else:
+                            logger.warning(
+                                f"Exhausted {settings.GEMINI_MAX_RETRIES} retries for "
+                                f"model='{model_name}' key={key_idx+1}. Trying next key."
+                            )
+
+        # All (model, key) combinations exhausted
+        logger.error(f"All models and all API keys exhausted for job {job_id}. Last: {last_category}")
+
         if mock_fallback_handler:
-            logger.info(f"Recovering via deterministic fallback handler for job {job_id}.")
+            logger.info(f"Recovering via deterministic fallback for job {job_id}.")
             fallback_res = mock_fallback_handler()
             if job and db:
                 job.status = AITaskStatus.COMPLETED
@@ -225,24 +242,23 @@ class ResilientGeminiService:
                 db.commit()
             return fallback_res
 
-        # Mark job as RETRYABLE_FAILED so state is safely preserved without data corruption
         if job and db:
             job.status = AITaskStatus.RETRYABLE_FAILED
             job.last_error_category = last_category
-            job.last_error_message = f"Transient failure across all models: {last_error_msg}"
+            job.last_error_message = f"All models and keys failed: {last_error_msg}"
             db.commit()
 
         raise AIOperationException(
-            message=f"Gemini service temporarily unavailable across all models. Job marked RETRYABLE_FAILED.",
+            message="Gemini service temporarily unavailable across all models and API keys. Job marked RETRYABLE_FAILED.",
             job_id=job_id,
             retryable=True,
             error_category=last_category
         )
 
-    async def _call_gemini_api(self, model: str, system_instruction: str, user_prompt: str) -> str:
-        """Direct REST call to Gemini generateContent endpoint."""
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
-        
+    async def _call_gemini_api(self, model: str, api_key: str, system_instruction: str, user_prompt: str) -> str:
+        """Direct REST call to Gemini generateContent endpoint using a specific API key."""
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+
         payload = {
             "contents": [
                 {
@@ -261,13 +277,14 @@ class ResilientGeminiService:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             data = resp.json()
-            
+
             candidates = data.get("candidates", [])
             if candidates and "content" in candidates[0] and "parts" in candidates[0]["content"]:
                 parts = candidates[0]["content"]["parts"]
                 if parts and "text" in parts[0]:
                     return parts[0]["text"]
-            
+
             raise ValueError("Invalid Gemini response format")
 
 gemini_service = ResilientGeminiService()
+

@@ -29,15 +29,30 @@ class Settings(BaseSettings):
     GCP_PROJECT_ID: Optional[str] = os.getenv("GCP_PROJECT_ID", "grant-agent-gcp")
     GCS_BUCKET_NAME: Optional[str] = os.getenv("GCS_BUCKET_NAME", "grant-agent-documents-vault")
     GCS_SCREENSHOTS_BUCKET: Optional[str] = os.getenv("GCS_SCREENSHOTS_BUCKET", "grant-agent-browser-screenshots")
+
+    # Three Gemini API keys — tried in order (key 1 → key 2 → key 3)
+    # If key 1 hits a rate limit or quota error, the system automatically
+    # switches to key 2, then key 3, before giving up.
+    GEMINI_API_KEY_1: Optional[str] = os.getenv("GEMINI_API_KEY_1", os.getenv("GEMINI_API_KEY", ""))
+    GEMINI_API_KEY_2: Optional[str] = os.getenv("GEMINI_API_KEY_2", "")
+    GEMINI_API_KEY_3: Optional[str] = os.getenv("GEMINI_API_KEY_3", "")
+
+    # Backward-compat alias: GEMINI_API_KEY still works and maps to key 1
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", "")
-    
+
     # Resilient Gemini Tier Hierarchy & Retry Configuration
-    PRIMARY_GEMINI_MODEL: str = os.getenv("PRIMARY_GEMINI_MODEL", os.getenv("GEMINI_MODEL", "gemini-1.5-pro"))
+    PRIMARY_GEMINI_MODEL: str = os.getenv("PRIMARY_GEMINI_MODEL", os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
     FALLBACK_GEMINI_MODEL: str = os.getenv("FALLBACK_GEMINI_MODEL", os.getenv("GEMINI_FLASH_MODEL", "gemini-1.5-flash"))
-    SECONDARY_FALLBACK_GEMINI_MODEL: str = os.getenv("SECONDARY_FALLBACK_GEMINI_MODEL", "gemini-1.0-pro")
+    SECONDARY_FALLBACK_GEMINI_MODEL: str = os.getenv("SECONDARY_FALLBACK_GEMINI_MODEL", "gemini-1.5-flash-8b")
     GEMINI_MAX_RETRIES: int = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
     GEMINI_RETRY_BASE_SECONDS: float = float(os.getenv("GEMINI_RETRY_BASE_SECONDS", "1.0"))
     GEMINI_REQUEST_TIMEOUT_SECONDS: float = float(os.getenv("GEMINI_REQUEST_TIMEOUT_SECONDS", "30.0"))
+
+    @property
+    def active_api_keys(self) -> List[str]:
+        """Returns all non-empty API keys in priority order (key 1 → 2 → 3)."""
+        candidates = [self.GEMINI_API_KEY_1, self.GEMINI_API_KEY_2, self.GEMINI_API_KEY_3]
+        return [k for k in candidates if k and not k.startswith("YOUR_") and not k.startswith("ENTER_")]
 
     # Backward compatibility
     @property

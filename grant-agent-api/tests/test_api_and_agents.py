@@ -158,13 +158,14 @@ async def test_resilient_gemini_service_backoff_and_fallback(monkeypatch):
     from app.models.enums import AITaskStatus
     import httpx
 
+    monkeypatch.setattr(settings, "GEMINI_API_KEY_1", "test-live-key")
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-live-key")
     db = SessionLocal()
     service = ResilientGeminiService()
 
     call_records = []
 
-    async def fake_call_gemini(model, sys_inst, prompt):
+    async def fake_call_gemini(model, api_key, sys_inst, prompt):
         call_records.append(model)
         if model == service.active_models[0]:
             # Simulate 503 UNAVAILABLE on primary model
@@ -200,11 +201,12 @@ async def test_resilient_gemini_exhausted_retries_marks_retryable_failed(monkeyp
     from app.models.enums import AITaskStatus
     import httpx
 
+    monkeypatch.setattr(settings, "GEMINI_API_KEY_1", "test-live-key")
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-live-key")
     db = SessionLocal()
     service = ResilientGeminiService()
 
-    async def always_fail_503(model, sys_inst, prompt):
+    async def always_fail_503(model, api_key, sys_inst, prompt):
         req = httpx.Request("POST", "https://api.fake")
         resp = httpx.Response(503, request=req)
         raise httpx.HTTPStatusError("503 No capacity available", request=req, response=resp)
