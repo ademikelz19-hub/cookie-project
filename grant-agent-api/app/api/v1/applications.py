@@ -25,8 +25,13 @@ from app.agents.validator import application_validator
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
 class PrepareApplicationRequest(BaseModel):
-    organisation_id: str
+    organisation_id: Optional[str] = None
+    org_id: Optional[str] = None
     grant_id: str
+
+    @property
+    def target_org_id(self) -> str:
+        return self.organisation_id or self.org_id or ""
 
 class UpdateApplicationStatusRequest(BaseModel):
     status: ApplicationStatus
@@ -47,13 +52,18 @@ def list_applications(
         query = query.filter(Application.organisation_id == organisation_id)
     return query.order_by(Application.created_at.desc()).all()
 
+@router.post("", response_model=ApplicationResponse)
 @router.post("/prepare", response_model=ApplicationResponse)
 def prepare_application(
     req: PrepareApplicationRequest,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    org = db.query(Organisation).filter(Organisation.id == req.organisation_id).first()
+    target_id = req.target_org_id
+    if not target_id:
+        raise HTTPException(status_code=400, detail="organisation_id or org_id is required")
+
+    org = db.query(Organisation).filter(Organisation.id == target_id).first()
     if not org:
         raise HTTPException(status_code=404, detail="Organisation not found")
 
