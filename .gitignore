@@ -27,7 +27,20 @@ target/
 Thumbs.db
 .vscode/
 .idea/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Python & Virtual Environments
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases & uploads
+*.db
+*.sqlite3
+uploads/
+test_vault/
+browser_screenshots/

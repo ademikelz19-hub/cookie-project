@@ -1,0 +1,17 @@
+FROM mcr.microsoft.com/playwright/python:v1.44.0-jammy
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+COPY grant-agent-worker/requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Chromium binaries in container
+RUN playwright install chromium
+
+COPY grant-agent-worker/ /app/
+COPY grant-agent-api/app/ /app/app/
+
+CMD ["python", "-m", "worker.browser_agent"]

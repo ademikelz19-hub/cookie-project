@@ -1,0 +1,126 @@
+{
+  "$schema": "https://policylayer.com/schemas/v1/mcp-policy.json",
+  "name": "autarch-cookie-mcp-guardrails",
+  "version": "1.0.0",
+  "description": "Strict PolicyLayer security enforcement and risk mitigation rules for Autarch Protocol autonomous agent on Cookie Chain (SVM)",
+  "mcpServer": "io.github.cookiechain/cookie-mcp",
+  "defaultEffect": "allow",
+  "policies": [
+    {
+      "id": "deny-destructive-lock-liquidity",
+      "tool": "lock_liquidity",
+      "effect": "deny",
+      "description": "Permanently blocks lock_liquidity tool to prevent irreversible locking of DAMM v2 liquidity positions and bricking of vault funds",
+      "reason": "Irreversible operation prohibited under non-custodial Smart Vault mandate"
+    },
+    {
+      "id": "deny-destructive-cancel-listing",
+      "tool": "cancel_listing",
+      "effect": "deny",
+      "description": "Blocks cancel_listing to ensure active Baked Bazaar listings remain steady and avoid erratic state cancellations during Grail Pot arbitrage",
+      "reason": "Destructive marketplace action prohibited"
+    },
+    {
+      "id": "sandbox-financial-trade",
+      "tool": "trade",
+      "effect": "allow",
+      "description": "Enforces transaction caps and slippage limits on Candy Shop swaps",
+      "conditions": {
+        "maxAmount": {
+          "field": "amount_in",
+          "maxValue": 100,
+          "unit": "COOK"
+        },
+        "maxSlippageBps": {
+          "field": "slippage_bps",
+          "maxValue": 500
+        }
+      }
+    },
+    {
+      "id": "sandbox-financial-nft-purchases",
+      "tool": "buy_nft",
+      "effect": "allow",
+      "description": "Limits Baked Bazaar floor purchases to prevent draining vault capital on overpriced assets",
+      "conditions": {
+        "maxPrice": {
+          "field": "price_cook",
+          "maxValue": 100,
+          "unit": "COOK"
+        }
+      }
+    },
+    {
+      "id": "sandbox-financial-nft-offers",
+      "tool": "make_offer",
+      "effect": "allow",
+      "description": "Limits Baked Bazaar bids to preserve capital and ensure break-even Grail Pot ticket accumulation",
+      "conditions": {
+        "maxBid": {
+          "field": "offer_amount_cook",
+          "maxValue": 100,
+          "unit": "COOK"
+        }
+      }
+    },
+    {
+      "id": "sandbox-staking-operations",
+      "tool": "stake",
+      "effect": "allow",
+      "description": "Restricts bCOOK liquid staking to safe batch amounts",
+      "conditions": {
+        "maxStake": {
+          "field": "amount_cook",
+          "maxValue": 500,
+          "unit": "COOK"
+        }
+      }
+    },
+    {
+      "id": "sandbox-liquidity-provision",
+      "tool": "add_liquidity",
+      "effect": "allow",
+      "description": "Restricts liquidity addition to verified pools in Cookiebox and Cookieswap",
+      "conditions": {
+        "maxDepositCook": {
+          "field": "amount_cook",
+          "maxValue": 250,
+          "unit": "COOK"
+        }
+      }
+    },
+    {
+      "id": "rate-limit-bridge-status",
+      "tool": "bridge_status",
+      "effect": "allow",
+      "description": "Caps Hyperlane bridge status polling to prevent exhausting upstream RPC rate limits",
+      "rateLimit": {
+        "maxRequests": 60,
+        "windowSeconds": 60,
+        "actionOnExceed": "throttle"
+      }
+    },
+    {
+      "id": "rate-limit-get-pools",
+      "tool": "get_pools",
+      "effect": "allow",
+      "description": "Caps pool querying to prevent spamming the Cookie Chain RPC node",
+      "rateLimit": {
+        "maxRequests": 60,
+        "windowSeconds": 60,
+        "actionOnExceed": "throttle"
+      }
+    },
+    {
+      "id": "rate-limit-general-reads",
+      "tool": "read_*",
+      "effect": "allow",
+      "description": "Applies a rolling window ceiling across generic read tools",
+      "rateLimit": {
+        "maxRequests": 120,
+        "windowSeconds": 60,
+        "actionOnExceed": "queue"
+      }
+    }
+  ]
+}
