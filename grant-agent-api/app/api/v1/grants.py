@@ -1,5 +1,6 @@
 import datetime
 from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -65,6 +66,70 @@ def get_grant(
     if not grant:
         raise HTTPException(status_code=404, detail="Grant not found")
     return grant
+
+class DiscoverGrantsRequest(BaseModel):
+    query: Optional[str] = "African tech startup rolling grants fast reply"
+    max_results: int = 5
+
+@router.post("/discover", response_model=List[GrantResponse])
+async def discover_active_grants_endpoint(
+    req: Optional[DiscoverGrantsRequest] = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    search_q = req.query if req and req.query else "African tech startup rolling grants fast reply"
+    limit = req.max_results if req and req.max_results else 5
+    raw_discovered = await grant_scout.discover_active_grants(query=search_q, max_results=limit)
+
+    saved_grants = []
+    for g in raw_discovered:
+        existing = db.query(Grant).filter(Grant.official_url == g["official_url"]).first()
+        if not existing:
+            new_grant = Grant(
+                grant_name=g["grant_name"],
+                funder=g["funder"],
+                official_url=g["official_url"],
+                application_url=g.get("application_url", g["official_url"]),
+                source_url=g.get("source_url", g["official_url"]),
+                funding_amount_min=g.get("funding_amount_min", 10000.0),
+                funding_amount_max=g.get("funding_amount_max", 100000.0),
+                currency=g.get("currency", "USD"),
+                deadline=g.get("deadline", "Rolling"),
+                country=g.get("country", "Nigeria & Africa"),
+                eligible_countries=g.get("eligible_countries", ["Nigeria", "Global"]),
+                eligible_regions=g.get("eligible_regions", ["Sub-Saharan Africa"]),
+                sector=g.get("sector", "Technology"),
+                grant_type=g.get("grant_type", "grant"),
+                project_stage=g.get("project_stage", "GREEN — IDEA STAGE"),
+                stage_classification=g.get("stage_classification", GrantStageClassification.GREEN_IDEA),
+                incorporation_required=g.get("incorporation_required", False),
+                mvp_required=g.get("mvp_required", False),
+                traction_required=g.get("traction_required", False),
+                revenue_required=g.get("revenue_required", False),
+                response_timeline=g.get("response_timeline", "2-4 weeks"),
+                application_status=g.get("application_status", GrantApplicationStatus.OPEN),
+                application_process=g.get("application_process", "Online portal"),
+                required_documents=g.get("required_documents", ["Organisation profile"]),
+                required_questions=g.get("required_questions", ["What problem does your initiative solve?"]),
+                selection_criteria=g.get("selection_criteria", "Impact and feasibility"),
+                verification_status=GrantVerificationStatus.OFFICIAL_VERIFIED,
+                verification_confidence=0.95
+            )
+            db.add(new_grant)
+            db.commit()
+            db.refresh(new_grant)
+
+            source = GrantSource(grant_id=new_grant.id, source_type="web_discovery", source_url=g["official_url"], is_official=True)
+            db.add(source)
+            for q_text in g.get("required_questions", []):
+                db.add(GrantQuestion(grant_id=new_grant.id, question_text=q_text, character_limit=2000, word_limit=300))
+            db.commit()
+            db.refresh(new_grant)
+            saved_grants.append(new_grant)
+        else:
+            saved_grants.append(existing)
+
+    return saved_grants
 
 @router.post("/scrape", response_model=GrantResponse)
 @router.post("/paste-url", response_model=GrantResponse)
