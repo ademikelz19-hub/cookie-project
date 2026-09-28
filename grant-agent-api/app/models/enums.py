@@ -103,6 +103,7 @@ class InterventionType(str, enum.Enum):
     LEGAL_DECLARATIONS = "LEGAL_DECLARATIONS"
     TERMS_AGREEMENT = "TERMS_AGREEMENT"
     MANUAL_TAKEOVER = "MANUAL_TAKEOVER"
+    MISSING_INFORMATION = "MISSING_INFORMATION"
 
 class UserRole(str, enum.Enum):
     ADMIN = "admin"

@@ -1,6 +1,6 @@
 import os
 import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -23,6 +23,7 @@ class StartBrowserSessionRequest(BaseModel):
     application_id: str
     target_url: Optional[str] = None
     exact_url_mode: bool = False
+    user_provided_answers: Optional[Dict[str, Any]] = None
 
 @router.post("/start", response_model=BrowserSessionResponse)
 def start_browser_session(

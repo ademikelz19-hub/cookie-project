@@ -39,7 +39,8 @@ class PlaywrightBrowserWorker:
         org_data: Dict[str, Any],
         approved_answers: Dict[str, str],
         approved_documents: List[Dict[str, Any]],
-        submit_after_approval: bool = False
+        submit_after_approval: bool = False,
+        user_provided_answers: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Executes end-to-end browser automation flow safely with human gates.
@@ -98,6 +99,7 @@ class PlaywrightBrowserWorker:
 
                 # 5. Field Identification and Filling
                 fields_completed = 0
+                missing_personal_fields = []
                 inputs = await self.page.query_selector_all("input, textarea, select")
 
                 for inp in inputs:
@@ -132,7 +134,8 @@ class PlaywrightBrowserWorker:
                         label_text=label_text,
                         field_type=inp_type,
                         org_data=org_data,
-                        approved_answers=approved_answers
+                        approved_answers=approved_answers,
+                        user_provided_answers=user_provided_answers
                     )
 
                     if val is not None:
@@ -161,6 +164,40 @@ class PlaywrightBrowserWorker:
                                 fields_completed += 1
                         except Exception as e:
                             self.events.append({"type": "field_fill_error", "field": inp_name, "error": str(e)})
+                    else:
+                        # Check if this field requires personal or missing information that AI doesn't have
+                        is_required = await inp.get_attribute("required") is not None
+                        is_personal = FieldMapper.is_personal_or_confidential_field(inp_id, inp_name, label_text)
+                        if (is_required or is_personal) and inp_type not in ["hidden", "submit", "button"]:
+                            missing_personal_fields.append({
+                                "field_id": inp_id,
+                                "field_name": inp_name,
+                                "label": label_text or inp_name or inp_id,
+                                "field_type": inp_type,
+                                "is_personal": is_personal,
+                                "is_required": is_required
+                            })
+
+                # Check if missing personal / required fields must be supplied by the user
+                if missing_personal_fields:
+                    shot_missing = await self.capture_step_screenshot(self.page, "gate_missing_information")
+                    field_names_str = ", ".join(f["label"] for f in missing_personal_fields[:3])
+                    self.events.append({
+                        "type": "missing_information_gate",
+                        "missing_fields": missing_personal_fields
+                    })
+                    await self.browser.close()
+                    return {
+                        "status": BrowserSessionStatus.WAITING_FOR_USER,
+                        "intervention_required": True,
+                        "intervention_type": InterventionType.MISSING_INFORMATION,
+                        "intervention_message": f"Personal information needed that the AI cannot retrieve: {field_names_str}. Please input this information to continue.",
+                        "current_url": current_url,
+                        "latest_screenshot_path": shot_missing,
+                        "events": self.events,
+                        "fields_completed": fields_completed,
+                        "missing_fields": missing_personal_fields
+                    }
 
                 shot_filled = await self.capture_step_screenshot(self.page, "02_fields_completed")
 

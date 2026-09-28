@@ -5,7 +5,7 @@ import { Settings, Cloud, Key, Database, Shield, Check } from "lucide-react";
 
 export default function SettingsPage() {
   const [gcpProjectId, setGcpProjectId] = useState("grant-agent-gcp");
-  const [geminiModel, setGeminiModel] = useState("gemini-1.5-pro");
+  const [geminiModel, setGeminiModel] = useState("gemini-3.8-flash");
   const [dbMode, setDbMode] = useState("Cloud SQL PostgreSQL");
   const [saved, setSaved] = useState(false);
 
@@ -72,8 +72,11 @@ export default function SettingsPage() {
                 onChange={(e) => setGeminiModel(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white"
               >
+                <option value="gemini-3.8-flash">Gemini 3.8 Flash (Recommended — Ultra-Fast Reasoning)</option>
+                <option value="gemini-3.5-flash">Gemini 3.5 Flash (Fast Extraction & Verification)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Efficient Fallback)</option>
                 <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Strategy & Alignment)</option>
-                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast Extraction & Verification)</option>
+                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy)</option>
               </select>
             </div>
 

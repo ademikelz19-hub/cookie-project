@@ -88,3 +88,23 @@ async def test_playwright_end_to_end_mock_application():
     assert "OFFICIAL-ADIF-" in result["confirmation_reference"]
     assert result["latest_screenshot_path"] is not None
     assert os.path.exists(result["latest_screenshot_path"])
+
+@pytest.mark.asyncio
+async def test_missing_personal_information_detection_and_mapping():
+    from worker.field_mapper import FieldMapper
+    # 1. Detection of personal confidential fields
+    assert FieldMapper.is_personal_or_confidential_field("bvn_field", "founder_bvn", "Founder Bank Verification Number (BVN)") is True
+    assert FieldMapper.is_personal_or_confidential_field("passport_no", "founder_passport", "Applicant International Passport Number") is True
+    assert FieldMapper.is_personal_or_confidential_field("company_name", "org_name", "Organisation Name") is False
+
+    # 2. When personal information is provided by user, FieldMapper applies it
+    val = FieldMapper.map_field_to_value(
+        field_id="bvn_field",
+        field_name="founder_bvn",
+        label_text="Founder Bank Verification Number (BVN)",
+        field_type="text",
+        org_data={"organisation_name": "Lioris"},
+        approved_answers={},
+        user_provided_answers={"founder_bvn": "22334455667"}
+    )
+    assert val == "22334455667"

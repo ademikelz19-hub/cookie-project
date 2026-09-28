@@ -7,16 +7,41 @@ class FieldMapper:
     and approved application answers.
     """
 
-    @staticmethod
+    PERSONAL_FIELD_KEYWORDS = [
+        "bvn", "nin", "ssn", "social security", "passport", "national id",
+        "id number", "identification number", "date of birth", "dob", "birth date",
+        "bank account", "account number", "routing number", "sort code",
+        "credit score", "driver license", "driver's license", "tax id", "tin",
+        "emergency contact", "next of kin", "marital status", "gender at birth",
+        "personal address", "residential address", "home address", "personal phone"
+    ]
+
+    @classmethod
+    def is_personal_or_confidential_field(cls, field_id: str, field_name: str, label_text: str) -> bool:
+        """Detects whether a form field asks for personal or confidential founder data."""
+        combined = f"{field_id} {field_name} {label_text}".lower()
+        return any(k in combined for k in cls.PERSONAL_FIELD_KEYWORDS)
+
+    @classmethod
     def map_field_to_value(
+        cls,
         field_id: str,
         field_name: str,
         label_text: str,
         field_type: str,
         org_data: Dict[str, Any],
-        approved_answers: Dict[str, str]
+        approved_answers: Dict[str, str],
+        user_provided_answers: Optional[Dict[str, Any]] = None
     ) -> Optional[Any]:
         identifier = f"{field_id} {field_name} {label_text}".lower()
+
+        # 0. User-provided interactive answers take absolute top priority
+        if user_provided_answers:
+            # Direct exact key match
+            for k, v in user_provided_answers.items():
+                k_clean = k.lower().strip()
+                if k_clean and (k_clean == field_id.lower() or k_clean == field_name.lower() or k_clean in identifier):
+                    return v
 
         # Handle Checkboxes
         if field_type == "checkbox":
@@ -36,7 +61,18 @@ class FieldMapper:
             if match_count >= 2:
                 return ans
 
-        # 2. Organisation Legal Name
+        # 2. Founder Specific Details (if present in org_data)
+        founders = org_data.get("founders", [])
+        if founders and any(k in identifier for k in ["founder", "applicant name", "first name", "last name", "full name"]):
+            primary_founder = founders[0]
+            if "first" in identifier:
+                return primary_founder.get("name", "").split()[0] if primary_founder.get("name") else None
+            if "last" in identifier or "surname" in identifier:
+                parts = primary_founder.get("name", "").split()
+                return parts[-1] if len(parts) > 1 else None
+            return primary_founder.get("name")
+
+        # 3. Organisation Legal Name
         if any(k in identifier for k in ["org", "organisation", "organization", "company", "legal name", "applicant name"]):
             if "founder" not in identifier and "first" not in identifier:
                 return org_data.get("organisation_name")

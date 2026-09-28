@@ -41,9 +41,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", "")
 
     # Resilient Gemini Tier Hierarchy & Retry Configuration
-    PRIMARY_GEMINI_MODEL: str = os.getenv("PRIMARY_GEMINI_MODEL", os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
-    FALLBACK_GEMINI_MODEL: str = os.getenv("FALLBACK_GEMINI_MODEL", os.getenv("GEMINI_FLASH_MODEL", "gemini-1.5-flash"))
-    SECONDARY_FALLBACK_GEMINI_MODEL: str = os.getenv("SECONDARY_FALLBACK_GEMINI_MODEL", "gemini-1.5-flash-8b")
+    PRIMARY_GEMINI_MODEL: str = os.getenv("PRIMARY_GEMINI_MODEL", os.getenv("GEMINI_MODEL", "gemini-3.8-flash"))
+    FALLBACK_GEMINI_MODEL: str = os.getenv("FALLBACK_GEMINI_MODEL", os.getenv("GEMINI_FLASH_MODEL", "gemini-3.5-flash"))
+    SECONDARY_FALLBACK_GEMINI_MODEL: str = os.getenv("SECONDARY_FALLBACK_GEMINI_MODEL", "gemini-2.5-flash")
     GEMINI_MAX_RETRIES: int = int(os.getenv("GEMINI_MAX_RETRIES", "3"))
     GEMINI_RETRY_BASE_SECONDS: float = float(os.getenv("GEMINI_RETRY_BASE_SECONDS", "1.0"))
     GEMINI_REQUEST_TIMEOUT_SECONDS: float = float(os.getenv("GEMINI_REQUEST_TIMEOUT_SECONDS", "30.0"))
